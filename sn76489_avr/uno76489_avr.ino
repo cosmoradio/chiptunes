@@ -2,58 +2,47 @@ void setup() {
   // sn76489
 
   /*
-   *      d5 p1  ad13
-   *      d6 p2  ad12
-   *      d7 p3  ad11
-   *      rd p4  ad
-   *      we p1  ad
-   *      ce p1  ad
-   *      aout 2*2
-   *      gnd to all
+   *      d5 p1  ad13    |    vcc p16
+   *      d6 p2  ad12    |    d4  p15 ad8
+   *      d7 p3  ad11    |    clk p14 ad9 4MHZ to all
+   *      rd p4  ad      |    d3  p13 ad10
+   *      we p1  ad      |    d2  p12 ad2 
+   *      ce p1  ad      |    d1 p11  ad3 
+   *      aout 2*2       |    d0 p10 ad4 
+   *      gnd to all     |    nc(audio in)
    *      
-   *      vcc p16
-   *      d4  p15 ad8
-   *      clk p14 ad9 4MHZ to all
-   *      d3  p13 ad10
-   *      d2  p12 ad2 
-   *      d1 p11  ad3
-   *      d0 p10 ad4
-   *      nc
-   * 
-   * a0-a3 - controls
-   * 
+   *      
+   *       a0-a3 - controls
+   *      
    */
+   
 
   initMusdriver();
   
-  #define SN_D0 PD4
-  #define SN_D1 PD3
-  #define SN_D2 PD2
-  #define SN_D3 PB2
-  #define SN_D4 PB0
-  #define SN_D5 PB5
-  #define SN_D6 PB4
-  #define SN_D7 PB3
-  #define SN_WE PD5
+  #define SN_D0 4
+  #define SN_D1 3
+  #define SN_D2 2
+  #define SN_D3 10
+  #define SN_D4 8
+  #define SN_D5 13
+  #define SN_D6 12
+  #define SN_D7 11
+  #define SN_WE 5
 
   #define CHP_SEL_1 PC0
   #define CHP_SEL_2 PC1
   #define CHP_SEL_3 PC2
   #define CHP_SEL_4 PC3
-
-  #define SN76489_C 4
   
-  
-  /* clocker */
+  // clocker 
   TCNT1 = 0;
   TCCR1B = B00001001;
   TCCR1A = B01000000;
   OCR1A = 1; // CLK frequency = 4 MHz
-  DDRB |= (1 << DDB1);//pinMode(9, OUTPUT); // 9 pin for clock
-  /* clocker end*/
-  /* set pins */
-  // data bus to output and set low level
-  /**/
+  DDRB |= (1 << DDB1); // 9 pin for clock
+  // clocker end
+  
+  //set pins data bus to output and set low level
   DDRD |= (1 << DDD4);  PORTD &= ~(1 << PD4);//4 pin arduino
   DDRD |= (1 << DDD3);  PORTD &= ~(1 << PD3);//3
   DDRD |= (1 << DDD2);  PORTD &= ~(1 << PD2);//2
@@ -62,13 +51,13 @@ void setup() {
   DDRB |= (1 << DDB3);  PORTB &= ~(1 << PB3);//11 
   DDRB |= (1 << DDB2);  PORTB &= ~(1 << PB2);//10
   DDRB |= (1 << DDB0);  PORTB &= ~(1 << PB0);//8
-  //bus-select chipt
+  //bus chipt select
   DDRC |= (1 << DDC0);  PORTC &= ~(1 << PC0);
   DDRC |= (1 << DDC1);  PORTC &= ~(1 << PC1);
   DDRC |= (1 << DDC2);  PORTC &= ~(1 << PC2);
   DDRC |= (1 << DDC3);  PORTC &= ~(1 << PC3);
-  DDRD |= (1 << DDD5);  PORTD &= ~(1 << PD5);//8//pinMode(SN_WE, OUTPUT); digitalWrite(SN_WE, LOW);
-
+  // write enable
+  DDRD |= (1 << DDD5);  PORTD &= ~(1 << PD5);// WE
 
   muteChannels( 0,0); //mute all channels of SN76489
   muteChannels( 0,0);
@@ -77,13 +66,16 @@ void setup() {
   PORTC &= ~(1 << CHP_SEL_2);//digitalWrite(CHP_SEL_2, 0);
   PORTC &= ~(1 << CHP_SEL_3);//digitalWrite(CHP_SEL_3, 0);
   PORTC &= ~(1 << CHP_SEL_4);//digitalWrite(CHP_SEL_4, 0);
-  /**/
+  
 }
 
 void loop() {
-  Serial.println("qweqwe");
   //readPakage()
   // put your main code here, to run repeatedly:
+  noiseOn(true, 0x00);
+  delay(500);
+  muteChannels(0,4);
+
   unsigned int i = 90; //tempo (beats/min) control
   //-----------------------------------------------------
   sendByte(0x8E); sendByte(0x26);
@@ -203,7 +195,6 @@ void muteChannels(int chip ,int channel)
   
   switch(chip){
     case 0: //to all chip
-      Serial.println("all up");
       digitalWrite(CHP_SEL_1, 0);  // LOW for select
       digitalWrite(CHP_SEL_2, 0);
       digitalWrite(CHP_SEL_3, 0);
@@ -256,7 +247,7 @@ void setTone(byte channel, uint16_t freq)
 {
   uint16_t f76489;
   f76489 = 4000000UL/(32*freq); /*compute 10-bit tone freq*/
-  //----------------------------------------------------------------------
+  
   switch(channel)               /*send 1st byte to channel 1, 2, or 3*/
   {
     case 1: sendByte(0x80 | (f76489 & 0x0F)); break;
@@ -264,7 +255,7 @@ void setTone(byte channel, uint16_t freq)
     case 3: sendByte(0xC0 | (f76489 & 0x0F));
   }
   sendByte(f76489>>4);          /*send 2nd byte*/
-  //----------------------------------------------------------------------
+  
   switch(channel)               /*max audio @ channel 1, 2, or 3*/
   {
     case 1: sendByte(0x90); break;
@@ -275,14 +266,18 @@ void setTone(byte channel, uint16_t freq)
 
 void noiseOn(boolean noiseType, byte shiftRate)
 {
-  if(noiseType==0)
+                  /*perioic noise*/           /*white noise*/
+  (noiseType==0)?sendByte(0xE0|shiftRate) : sendByte(0xE4|shiftRate);   
+  sendByte(0xF0);
+}
+
+void setVolume(byte channel, byte volume){
+  /*volume from 0x00 to 0x0f*/
+  switch(channel)               
   {
-    sendByte(0xE0|shiftRate);     /*perioic noise*/
-    sendByte(0xF0);
-  }
-  else
-  {
-    sendByte(0xE4|shiftRate);     /*white noise*/
-    sendByte(0xF0);
+    case 1: sendByte(0x90|volume); break;
+    case 2: sendByte(0xB0|volume); break;
+    case 3: sendByte(0xD0|volume); break;
+    case 4: sendByte(0xf0|volume); break;
   }
 }
